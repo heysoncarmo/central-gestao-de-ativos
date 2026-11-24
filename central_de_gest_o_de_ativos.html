@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central de Gestão de Ativos | Infraestrutura & TI</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        obsidian: '#05080f',
+                        deepblue: '#0a0f1c',
+                        electric: '#00a8ff',
+                        cyanpulse: '#38bdf8',
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 8s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px) scale(1)' },
+                            '50%': { transform: 'translateY(-18px) scale(1.03)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Fundo Base e Cyber Grid */
+        body {
+            background-color: #05080f;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        .cyber-grid {
+            background-size: 44px 44px;
+            background-image: 
+                linear-gradient(to right, rgba(0, 168, 255, 0.045) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 168, 255, 0.045) 1px, transparent 1px);
+            mask-image: radial-gradient(ellipse 85% 75% at 50% 25%, #000 55%, transparent 100%);
+            -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 25%, #000 55%, transparent 100%);
+        }
+
+        /* Glassmorphism e Efeito de Brilho no Hover */
+        .asset-card {
+            background: linear-gradient(145deg, rgba(14, 22, 40, 0.72) 0%, rgba(7, 11, 22, 0.88) 100%);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(56, 189, 248, 0.14);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+            transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), 
+                        border-color 0.35s ease, 
+                        box-shadow 0.35s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .asset-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(
+                600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+                rgba(0, 168, 255, 0.12),
+                transparent 40%
+            );
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .asset-card:hover::before {
+            opacity: 1;
+        }
+
+        .asset-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(56, 189, 248, 0.48);
+            box-shadow: 0 20px 40px -15px rgba(0, 168, 255, 0.22), 0 0 20px rgba(0, 168, 255, 0.08);
+        }
+
+        /* Estilo Específico para Sistema Legado / Obsoleto */
+        .asset-card.legacy-card {
+            border-color: rgba(245, 158, 11, 0.28);
+            background: linear-gradient(145deg, rgba(24, 19, 18, 0.75) 0%, rgba(9, 12, 22, 0.9) 100%);
+        }
+
+        .asset-card.legacy-card::before {
+            background: radial-gradient(
+                600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+                rgba(245, 158, 11, 0.12),
+                transparent 40%
+            );
+        }
+
+        .asset-card.legacy-card:hover {
+            border-color: rgba(245, 158, 11, 0.65);
+            box-shadow: 0 20px 40px -15px rgba(245, 158, 11, 0.18), 0 0 22px rgba(245, 158, 11, 0.1);
+        }
+
+        /* Animações de Entrada Escalonada */
+        @keyframes cardEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(22px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .animate-card-in {
+            animation: cardEntrance 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            opacity: 0;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #05080f;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00a8ff;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-sky-500/30 selection:text-sky-200">
+
+    <!-- Elementos Decorativos de Fundo -->
+    <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <!-- Cyber Grid -->
+        <div class="absolute inset-0 cyber-grid"></div>
+        <!-- Orbes de Luz Azul -->
+        <div class="absolute -top-32 -left-24 w-96 h-96 bg-blue-600/20 rounded-full blur-[130px] animate-float"></div>
+        <div class="absolute top-1/3 -right-24 w-[28rem] h-[28rem] bg-sky-500/15 rounded-full blur-[140px] animate-pulse-slow"></div>
+        <div class="absolute bottom-0 left-1/3 w-80 h-80 bg-indigo-600/10 rounded-full blur-[120px]"></div>
+        <!-- Canvas para partículas sutis -->
+        <canvas id="bgParticles" class="w-full h-full opacity-45"></canvas>
+    </div>
+
+    <!-- Container Principal -->
+    <div class="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16">
+        
+        <!-- Cabeçalho -->
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-8 border-b border-slate-800/80">
+            <div class="space-y-2">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-400/25 text-sky-400 text-xs font-medium tracking-wide">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                    </span>
+                    INFRAESTRUTURA & TI
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+                    Central de <span class="bg-gradient-to-r from-sky-400 via-blue-400 to-cyan-300 bg-clip-text text-transparent">Gestão de Ativos</span>
+                </h1>
+            </div>
+
+            <!-- Widget Relógio / Data em Tempo Real -->
+            <div class="flex items-center justify-between md:justify-end gap-4 bg-[#0a0f1c]/90 backdrop-blur-md border border-slate-800/90 rounded-2xl px-5 py-3.5 shadow-lg">
+                <div class="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="text-right">
+                    <div id="liveClock" class="font-mono text-xl sm:text-2xl font-semibold text-white tracking-wider">00:00:00</div>
+                    <div id="liveDate" class="text-xs text-slate-400 capitalize">Carregando data...</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Barra de Controle: Busca, Filtros e Botão Adicionar -->
+        <section class="mt-8 mb-8 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+            
+            <!-- Campo de Busca -->
+            <div class="relative flex-1 max-w-md">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Buscar sistema, IP, planilha ou ferramenta..." 
+                    class="w-full pl-11 pr-10 py-2.5 bg-[#0a0f1c]/90 border border-slate-800 hover:border-slate-700 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 rounded-xl text-sm text-white placeholder-slate-500 outline-none transition-all"
+                >
+                <button id="clearSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white" title="Limpar busca">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Filtros por Categoria e Botão Novo Link -->
+            <div class="flex flex-wrap items-center justify-between sm:justify-start gap-2">
+                <div id="categoryFilters" class="flex flex-wrap items-center gap-1.5 bg-[#0a0f1c]/80 p-1.5 rounded-xl border border-slate-800/90">
+                    <button data-filter="todos" class="filter-btn active px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all bg-sky-500 text-white shadow-sm shadow-sky-500/30">
+                        Todos
+                    </button>
+                    <button data-filter="inventario" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all">
+                        Inventário
+                    </button>
+                    <button data-filter="seguranca" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all">
+                        Segurança
+                    </button>
+                </div>
+
+                <!-- Botão Discreto + Adicionar Link -->
+                <button id="openModalBtn" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-sky-500/15 text-slate-300 hover:text-sky-300 border border-slate-800 hover:border-sky-500/40 text-xs font-medium transition-all cursor-pointer">
+                    <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    <span>Adicionar Link</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Grid de Cards -->
+        <main>
+            <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Os cards serão renderizados via JavaScript -->
+            </div>
+
+            <!-- Estado Vazio (caso a busca não encontre nada) -->
+            <div id="emptyState" class="hidden flex-col items-center justify-center text-center py-16 px-4 rounded-2xl border border-dashed border-slate-800 bg-[#0a0f1c]/40">
+                <div class="w-12 h-12 rounded-full bg-slate-800/80 flex items-center justify-center text-slate-400 mb-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-base font-semibold text-white">Nenhum sistema encontrado</h3>
+                <p class="text-sm text-slate-400 mt-1 max-w-sm">Não encontramos nenhum link correspondente aos filtros atuais. Tente buscar por outro termo.</p>
+                <button id="resetFiltersBtn" class="mt-4 px-4 py-2 rounded-xl bg-sky-500/15 text-sky-400 hover:bg-sky-500/25 border border-sky-500/30 text-xs font-medium transition-all">
+                    Limpar filtros
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Rodapé Minimalista -->
+    <footer class="relative z-10 border-t border-slate-800/60 bg-[#05080f]/80 backdrop-blur-md">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500/80"></span>
+                <span>Central de Gestão de Ativos de TI • Uso Corporativo</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="totalLinksCounter" class="font-mono text-slate-400">4 sistemas ativos</span>
+                <span>•</span>
+                <span>Infraestrutura & Governança</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal para Adicionar Novo Link (Salvo em localStorage) -->
+    <div id="addLinkModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/75 backdrop-blur-sm transition-opacity">
+        <div class="w-full max-w-md rounded-2xl bg-[#0a0f1c] border border-sky-500/30 shadow-2xl shadow-sky-950/50 overflow-hidden transform transition-all">
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-1.5 rounded-lg bg-sky-500/15 text-sky-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-base font-semibold text-white">Novo Atalho de Sistema</h2>
+                </div>
+                <button id="closeModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="addLinkForm" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Nome do Sistema *</label>
+                    <input type="text" id="linkTitle" required placeholder="Ex: Zabbix Monitoramento" class="w-full px-3.5 py-2.5 bg-[#05080f] border border-slate-800 focus:border-sky-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">URL de Acesso *</label>
+                    <input type="url" id="linkUrl" required placeholder="https:// ou http://..." class="w-full px-3.5 py-2.5 bg-[#05080f] border border-slate-800 focus:border-sky-500 rounded-xl text-sm text-white font-mono placeholder-slate-600 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Categoria</label>
+                        <select id="linkCategory" class="w-full px-3 py-2.5 bg-[#05080f] border border-slate-800 focus:border-sky-500 rounded-xl text-sm text-white outline-none">
+                            <option value="inventario">Inventário</option>
+                            <option value="seguranca">Segurança</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Tag / Etiqueta</label>
+                        <input type="text" id="linkBadge" placeholder="Ex: Rede Interna" class="w-full px-3.5 py-2.5 bg-[#05080f] border border-slate-800 focus:border-sky-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Descrição Breve *</label>
+                    <textarea id="linkDesc" required rows="2" placeholder="Descreva a finalidade desta ferramenta..." class="w-full px-3.5 py-2 bg-[#05080f] border border-slate-800 focus:border-sky-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none resize-none"></textarea>
+                </div>
+
+                <div class="pt-2 flex items-center justify-end gap-3">
+                    <button type="button" id="cancelModalBtn" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/70 transition-all">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white text-xs font-semibold shadow-lg shadow-sky-500/25 transition-all">
+                        Salvar Atalho
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast de Notificação -->
+    <div id="toastNotification" class="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-[#0a0f1c] border border-sky-500/40 text-white text-xs font-medium shadow-2xl shadow-sky-950/60 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+        <span id="toastMessage">Link copiado para a área de transferência!</span>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. DADOS PRINCIPAIS (FIXOS) E LOCALSTORAGE
+        // ==========================================
+        const CORE_LINKS = [
+            {
+                id: 'core-sheets',
+                title: 'Controle de Equipamentos',
+                subtitle: 'Planilha no Google Sheets',
+                url: 'https://docs.google.com/spreadsheets/d/1ZqseqiF56c6IDplRwdeVJYiCPvuoVZ25x8M-TOqqzyk/edit?gid=0#gid=0',
+                category: 'inventario',
+                badge: { text: 'Google Sheets', style: 'emerald' },
+                isLegacy: false,
+                isCustom: false,
+                iconType: 'spreadsheet'
+            },
+            {
+                id: 'core-snipeit',
+                title: 'Snipe-IT',
+                subtitle: 'Inventário de ativos na intranet',
+                url: 'http://10.10.1.91:8000/',
+                category: 'inventario',
+                badge: { text: 'Rede Interna', style: 'blue' },
+                isLegacy: false,
+                isCustom: false,
+                iconType: 'server'
+            },
+            {
+                id: 'core-erp-quark',
+                title: 'ERP Quark',
+                subtitle: 'Sistema interno em transição',
+                url: 'https://erp.quark.tec.br/app/index.jsf',
+                category: 'inventario',
+                badge: { text: 'Ficará Obsoleto', style: 'amber' },
+                isLegacy: true,
+                isCustom: false,
+                iconType: 'legacy'
+            },
+            {
+                id: 'core-bitdefender',
+                title: 'Bitdefender GravityZone',
+                subtitle: 'Proteção e controle de endpoints',
+                url: 'https://gravityzone.bitdefender.com/',
+                category: 'seguranca',
+                badge: { text: 'Segurança', style: 'cyan' },
+                isLegacy: false,
+                isCustom: false,
+                iconType: 'shield'
+            }
+        ];
+
+        const STORAGE_KEY = 'ti_asset_hub_custom_links_v1';
+        let currentFilter = 'todos';
+        let searchQuery = '';
+
+        function getCustomLinks() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                return stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                console.error('Erro ao ler localStorage:', e);
+                return [];
+            }
+        }
+
+        function saveCustomLinks(links) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
+            } catch (e) {
+                console.error('Erro ao salvar no localStorage:', e);
+            }
+        }
+
+        // ==========================================
+        // 2. ÍCONES SVG MODERNOS
+        // ==========================================
+        function getIconSVG(type, isLegacy) {
+            if (isLegacy || type === 'legacy') {
+                return `
+                    <svg class="w-6 h-6 text-amber-400 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>`;
+            }
+            switch (type) {
+                case 'spreadsheet':
+                    return `
+                        <svg class="w-6 h-6 text-emerald-400 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>`;
+                case 'server':
+                    return `
+                        <svg class="w-6 h-6 text-sky-400 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                        </svg>`;
+                case 'shield':
+                    return `
+                        <svg class="w-6 h-6 text-cyan-400 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>`;
+                default:
+                    return `
+                        <svg class="w-6 h-6 text-sky-400 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+                        </svg>`;
+            }
+        }
+
+        function getBadgeClasses(style) {
+            const map = {
+                emerald: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25',
+                sky: 'bg-sky-500/10 text-sky-300 border-sky-500/25',
+                blue: 'bg-blue-500/15 text-blue-300 border-blue-400/30 font-mono',
+                cyan: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/25',
+                indigo: 'bg-indigo-500/15 text-indigo-300 border-indigo-400/25',
+                amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+            };
+            return map[style] || map.sky;
+        }
+
+        // ==========================================
+        // 3. RENDERIZAÇÃO DOS CARDS E INTERAÇÕES
+        // ==========================================
+        function renderCards() {
+            const grid = document.getElementById('cardsGrid');
+            const emptyState = document.getElementById('emptyState');
+            const counter = document.getElementById('totalLinksCounter');
+
+            const allLinks = [...CORE_LINKS, ...getCustomLinks()];
+            counter.textContent = `${allLinks.length} ${allLinks.length === 1 ? 'sistema cadastrado' : 'sistemas cadastrados'}`;
+
+            const filtered = allLinks.filter(item => {
+                const matchesCategory = currentFilter === 'todos' || item.category === currentFilter;
+                const q = searchQuery.toLowerCase().trim();
+                const matchesSearch = !q || 
+                    item.title.toLowerCase().includes(q) ||
+                    (item.subtitle && item.subtitle.toLowerCase().includes(q)) ||
+                    item.url.toLowerCase().includes(q) ||
+                    (item.badge && item.badge.text.toLowerCase().includes(q));
+                return matchesCategory && matchesSearch;
+            });
+
+            grid.innerHTML = '';
+
+            if (filtered.length === 0) {
+                grid.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+                return;
+            }
+
+            grid.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+            emptyState.classList.remove('flex');
+
+            filtered.forEach((item, index) => {
+                const card = document.createElement('a');
+                card.href = item.url;
+                card.target = '_blank';
+                card.rel = 'noopener noreferrer';
+                card.className = `asset-card group rounded-2xl p-5 flex items-center justify-between gap-4 animate-card-in cursor-pointer ${item.isLegacy ? 'legacy-card' : ''}`;
+                card.style.animationDelay = `${index * 75}ms`;
+
+                // Efeito de brilho seguindo o cursor
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    card.style.setProperty('--mouse-x', `${x}px`);
+                    card.style.setProperty('--mouse-y', `${y}px`);
+                });
+
+                const badgeHTML = item.badge ? `
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getBadgeClasses(item.badge.style)}">
+                        ${item.isLegacy ? '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>' : ''}
+                        ${item.badge.text}
+                    </span>
+                ` : '';
+
+                const deleteCustomBtnHTML = item.isCustom ? `
+                    <button type="button" onclick="event.preventDefault(); event.stopPropagation(); deleteCustomLink('${item.id}')" title="Remover atalho" class="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                ` : '';
+
+                const iconContainerBg = item.isLegacy 
+                    ? 'bg-amber-500/10 border-amber-500/30 group-hover:border-amber-400/60' 
+                    : 'bg-sky-500/10 border-sky-500/20 group-hover:border-sky-400/50';
+
+                card.innerHTML = `
+                    <div class="relative z-10 flex items-center gap-4 min-w-0">
+                        <div class="w-12 h-12 rounded-xl border ${iconContainerBg} flex items-center justify-center shrink-0 transition-colors">
+                            ${getIconSVG(item.iconType, item.isLegacy)}
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 class="text-base sm:text-lg font-semibold text-white group-hover:text-sky-300 transition-colors truncate">
+                                    ${item.title}
+                                </h2>
+                                ${badgeHTML}
+                            </div>
+                            <p class="mt-0.5 text-xs sm:text-sm text-slate-400 truncate">
+                                ${item.subtitle || item.description || ''}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="relative z-10 flex items-center gap-1.5 shrink-0">
+                        <button 
+                            type="button"
+                            onclick="event.preventDefault(); event.stopPropagation(); copyToClipboard('${item.url}', this)" 
+                            class="p-2 rounded-xl text-slate-400 hover:text-sky-300 hover:bg-sky-500/10 border border-transparent hover:border-sky-500/25 transition-all cursor-pointer"
+                            title="Copiar link"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                        </button>
+                        ${deleteCustomBtnHTML}
+                        <div class="w-9 h-9 rounded-xl bg-slate-900/80 group-hover:bg-sky-500/20 border border-slate-800 group-hover:border-sky-500/40 flex items-center justify-center text-slate-400 group-hover:text-sky-300 transition-all">
+                            <svg class="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                        </div>
+                    </div>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        // ==========================================
+        // 4. COPIAR URL (COMPATÍVEL COM IFRAME)
+        // ==========================================
+        function copyToClipboard(text, buttonEl) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+
+            try {
+                document.execCommand('copy');
+                buttonEl.classList.add('border-emerald-500/50', 'text-emerald-300', 'bg-emerald-500/10');
+                showToast('URL copiada para a área de transferência!');
+
+                setTimeout(() => {
+                    buttonEl.classList.remove('border-emerald-500/50', 'text-emerald-300', 'bg-emerald-500/10');
+                }, 1800);
+            } catch (err) {
+                showToast('Não foi possível copiar o link.');
+            } finally {
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toastNotification');
+            const toastMsg = document.getElementById('toastMessage');
+            toastMsg.textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            clearTimeout(window.toastTimeout);
+            window.toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2800);
+        }
+
+        // ==========================================
+        // 5. FILTROS, BUSCA E MODAL DE ADIÇÃO
+        // ==========================================
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            const clearBtn = document.getElementById('clearSearchBtn');
+            if (searchQuery.length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+            renderCards();
+        });
+
+        document.getElementById('clearSearchBtn').addEventListener('click', () => {
+            const input = document.getElementById('searchInput');
+            input.value = '';
+            searchQuery = '';
+            document.getElementById('clearSearchBtn').classList.add('hidden');
+            renderCards();
+            input.focus();
+        });
+
+        document.getElementById('resetFiltersBtn').addEventListener('click', () => {
+            document.getElementById('searchInput').value = '';
+            searchQuery = '';
+            document.getElementById('clearSearchBtn').classList.add('hidden');
+            setActiveFilter('todos');
+        });
+
+        function setActiveFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                const isTarget = btn.dataset.filter === filter;
+                if (isTarget) {
+                    btn.className = 'filter-btn active px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all bg-sky-500 text-white shadow-sm shadow-sky-500/30';
+                } else {
+                    btn.className = 'filter-btn px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all';
+                }
+            });
+            renderCards();
+        }
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => setActiveFilter(btn.dataset.filter));
+        });
+
+        // Controles do Modal
+        const modal = document.getElementById('addLinkModal');
+        const openModal = () => {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.getElementById('linkTitle').focus();
+        };
+        const closeModal = () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('addLinkForm').reset();
+        };
+
+        document.getElementById('openModalBtn').addEventListener('click', openModal);
+        document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+        document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        document.getElementById('addLinkForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = document.getElementById('linkTitle').value.trim();
+            const url = document.getElementById('linkUrl').value.trim();
+            const category = document.getElementById('linkCategory').value;
+            const badgeText = document.getElementById('linkBadge').value.trim() || 'Atalho';
+            const subtitle = document.getElementById('linkDesc').value.trim();
+
+            const newLink = {
+                id: 'custom-' + Date.now(),
+                title,
+                subtitle,
+                url,
+                category,
+                badge: { text: badgeText, style: 'sky' },
+                isLegacy: false,
+                isCustom: true,
+                iconType: category === 'seguranca' ? 'shield' : 'default'
+            };
+
+            const existing = getCustomLinks();
+            existing.push(newLink);
+            saveCustomLinks(existing);
+
+            closeModal();
+            renderCards();
+            showToast('Novo atalho salvo no navegador!');
+        });
+
+        window.deleteCustomLink = function(id) {
+            const updated = getCustomLinks().filter(item => item.id !== id);
+            saveCustomLinks(updated);
+            renderCards();
+            showToast('Atalho personalizado removido.');
+        };
+
+        // ==========================================
+        // 6. RELÓGIO EM TEMPO REAL (PT-BR)
+        // ==========================================
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateStr = now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+            
+            document.getElementById('liveClock').textContent = timeStr;
+            document.getElementById('liveDate').textContent = dateStr;
+        }
+
+        // ==========================================
+        // 7. PARTÍCULAS SUTIS NO PLANO DE FUNDO
+        // ==========================================
+        function initParticles() {
+            const canvas = document.getElementById('bgParticles');
+            const ctx = canvas.getContext('2d');
+            let width, height, particles;
+
+            function resize() {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+                createParticles();
+            }
+
+            function createParticles() {
+                const count = Math.min(Math.floor(width / 28), 55);
+                particles = Array.from({ length: count }, () => ({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    r: Math.random() * 1.6 + 0.4,
+                    vx: (Math.random() - 0.5) * 0.25,
+                    vy: (Math.random() - 0.5) * 0.25,
+                    alpha: Math.random() * 0.5 + 0.15
+                }));
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    if (p.x < 0) p.x = width;
+                    if (p.x > width) p.x = 0;
+                    if (p.y < 0) p.y = height;
+                    if (p.y > height) p.y = 0;
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(56, 189, 248, ${p.alpha})`;
+                    ctx.fill();
+                });
+                requestAnimationFrame(animate);
+            }
+
+            window.addEventListener('resize', resize);
+            resize();
+            animate();
+        }
+
+        // Inicialização
+        window.onload = function() {
+            updateClock();
+            setInterval(updateClock, 1000);
+            renderCards();
+            initParticles();
+        };
+    </script>
+</body>
+</html>
